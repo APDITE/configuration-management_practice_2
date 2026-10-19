@@ -1,0 +1,29 @@
+# Служебные файлы Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Виртуальные окружения
+.venv/
+venv/
+env/
+.env
+
+# Кэши инструментов
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Настройки редактора кода
+.idea/
+.vscode/
+*.swp
+
+# macOS
+.DS_Store
