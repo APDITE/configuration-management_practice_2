@@ -1,5 +1,5 @@
 #!/bin/sh
-# Обработка ошибок для всех параметров командной строки.
+# Обработка ошибок параметров командной строки и получения зависимостей.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1
 URL=https://repo1.maven.org/maven2
@@ -39,3 +39,10 @@ run -p "$PKG" -r "$URL" -m prod
 echo "=== неизвестные параметры ==="
 run -p "$PKG" -r "$URL" --depth 3
 run --pack "$PKG" -r "$URL"
+
+echo "=== получение зависимостей ==="
+run -p org.example:no-such-package:1.0 -r "$URL"
+run -p "$PKG" -r http://127.0.0.1:9
+run -p Z -r "$TEST_REPO" -m test
+cat repos/broken.txt
+run -p A -r repos/broken.txt -m test
