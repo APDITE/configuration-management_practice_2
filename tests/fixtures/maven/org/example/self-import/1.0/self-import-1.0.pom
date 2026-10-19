@@ -1,0 +1,31 @@
+<project>
+  <groupId>org.example</groupId>
+  <artifactId>self-import</artifactId>
+  <version>1.0</version>
+  <properties>
+    <a>${b}</a>
+    <b>${a}</b>
+  </properties>
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.example</groupId>
+        <artifactId>self-import</artifactId>
+        <version>1.0</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+  <dependencies>
+    <dependency>
+      <groupId>org.example</groupId>
+      <artifactId>unmanaged</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.example</groupId>
+      <artifactId>looped</artifactId>
+      <version>${a}</version>
+    </dependency>
+  </dependencies>
+</project>
