@@ -8,23 +8,33 @@
 графа зависимостей пакетов Java (Maven). Готовые менеджеры пакетов и
 библиотеки для получения зависимостей не используются.
 
-Текущее состояние — **этап 1**: минимальный прототип с конфигурацией.
-Приложение принимает параметры командной строки, проверяет их и выводит
-в формате `ключ=значение`.
+Текущее состояние — **этап 2**: сбор данных. Приложение принимает
+параметры командной строки, скачивает файл описания пакета (POM) из
+репозитория Maven и выводит все прямые зависимости заданного пакета.
+Поддержан и тестовый репозиторий из текстового файла.
 
 Сторонние зависимости не требуются — только стандартная библиотека
-Python 3.8+.
+Python 3.8+: `argparse` (параметры), `urllib.request` (загрузка файлов
+по HTTP), `xml.etree.ElementTree` (разбор XML). Логика получения
+зависимостей (наследование, свойства, dependencyManagement) реализована
+самостоятельно, без Maven и библиотек для работы с ним.
 
 ## Структура репозитория
 
 ```
 src/
-  depviz.py   точка входа: разбор параметров и их вывод
-  config.py   параметры командной строки и их проверка
-repos/        тестовые репозитории для режима test
-scripts/      скрипты ОС для демонстрации работы
-tests/        модульные тесты (unittest)
-run.sh        запуск приложения и тестов
+  depviz.py     точка входа: выбор репозитория и вывод зависимостей
+  config.py     параметры командной строки и их проверка
+  pom.py        разбор файла POM: координаты, свойства, зависимости
+  maven.py      загрузка POM из репозитория Maven, прямые зависимости
+  testrepo.py   тестовый репозиторий из текстового файла
+  errors.py     общее исключение RepositoryError
+repos/          тестовые репозитории для режима test
+scripts/        скрипты ОС для демонстрации работы
+tests/          модульные тесты (unittest)
+  fixtures/maven/  тестовый репозиторий Maven для локального сервера
+  maven_server.py  локальный HTTP-сервер для тестов без сети
+run.sh          запуск приложения и тестов
 ```
 
 ## Настройки
@@ -45,8 +55,10 @@ run.sh        запуск приложения и тестов
 - `-h`, `--help` — справка по параметрам.
 
 Тестовый репозиторий — текстовый файл, в каждой строке которого указан
-пакет и через двоеточие его прямые зависимости (пример —
-`repos/simple.txt`):
+пакет и через двоеточие его прямые зависимости через пробел (пример —
+`repos/simple.txt`). Пустые строки пропускаются; пакет, который
+встречается только среди зависимостей, считается пакетом без
+зависимостей.
 
 ```
 A: B C
@@ -57,12 +69,37 @@ D:
 
 ## Функции
 
-При запуске все параметры выводятся в формате `ключ=значение`
-(порядок: `package`, `repo`, `mode`), код завершения — 0.
+### Прямые зависимости (режим `remote`)
 
-### Обработка ошибок
+1. По координатам `groupId:artifactId:version` строится адрес файла
+   `{repo}/{groupId с «/» вместо «.»}/{artifactId}/{version}/`
+   `{artifactId}-{version}.pom`, файл скачивается по HTTP(S).
+2. Загружается цепочка родительских POM (`<parent>`) до корня.
+3. Свойства `<properties>` объединяются от предков к потомку; значения
+   `${имя}` подставляются, включая встроенные `${project.version}`,
+   `${project.groupId}`, `${project.parent.version}` и др.
+4. Зависимости `<dependencies>` и `<dependencyManagement>` наследуются
+   от родителей (запись потомка важнее записи предка).
+5. Записи `dependencyManagement` со `scope=import` и `type=pom`
+   импортируют управляемые версии из BOM (явно объявленные записи
+   важнее импортированных).
+6. Если у зависимости не указаны `version` или `scope`, они берутся из
+   `dependencyManagement`; scope по умолчанию — `compile`.
 
-При ошибке выводятся краткая справка и причина, код завершения — 2.
+Выводятся все прямые зависимости, по одной в строке, в формате
+`groupId:artifactId:version [scope]`; необязательные помечаются
+`(optional)`. Если версию определить не удалось, вместо неё выводится
+`?`. Если зависимостей нет — `<пакет>: no direct dependencies`.
+
+### Прямые зависимости (режим `test`)
+
+Выводятся имена пакетов из строки заданного пакета в файле тестового
+репозитория, по одному в строке.
+
+### Обработка ошибок параметров
+
+При ошибке в параметрах выводятся краткая справка и причина, код
+завершения — 2.
 
 - `--package`:
   - не указан: `the following arguments are required: -p/--package`;
@@ -89,6 +126,29 @@ D:
 - Неизвестный параметр: `unrecognized arguments: --depth 3`.
 - Сокращённые имена параметров (например, `--pack`) не принимаются.
 
+### Ошибки получения зависимостей
+
+Выводится `depviz: error: <причина>`, код завершения — 1.
+
+- режим `remote`:
+  - пакета нет в репозитории (HTTP 404):
+    `package not found in repository: <URL файла POM>`;
+  - нет родительского POM: `cannot load parent POM <координаты> of ...`;
+  - другая ошибка HTTP: `HTTP error <код> <причина>: <URL>`;
+  - репозиторий недоступен: `cannot reach repository: <причина>`;
+  - некорректный XML: `<URL>: malformed POM: <подробности>`;
+  - циклическая цепочка родителей: `cyclic parent POM: <координаты>`;
+- режим `test`:
+  - пакета нет в файле: `package 'Z' not found in test repository`;
+  - строка неверного формата:
+    `<файл>:<строка>: expected 'NAME: DEPENDENCY ...' with capital
+    Latin letters`;
+  - пакет описан дважды: `package 'A' is already defined`;
+  - файл не читается как текст UTF-8: `cannot read test repository`.
+
+Циклический импорт BOM и циклические ссылки свойств не приводят к
+зацикливанию: повторный импорт пропускается, нераскрытое свойство
+выводится как есть (например, `${a}`).
 ## Сборка и запуск
 
 Сборка не требуется.
@@ -108,29 +168,52 @@ python3 -m unittest discover -s tests -t . -v
 
 Скрипты ОС (`scripts/`):
 
-- `test_params.sh` — корректные запуски в режимах `remote` и `test`;
-- `test_errors.sh` — ошибки каждого параметра и неизвестный параметр
-  (ошибка `permission denied` не воспроизводится при запуске от root).
+- `test_deps.sh` — прямые зависимости пакетов из Maven Central
+  (нужен интернет) и из `repos/simple.txt`;
+- `test_errors.sh` — ошибки каждого параметра, неизвестный параметр и
+  ошибки получения зависимостей (ошибка `permission denied` не
+  воспроизводится при запуске от root).
+
+Модульные тесты не обращаются к сети: для режима `remote` они
+запускают локальный HTTP-сервер с файлами из `tests/fixtures/maven`.
+Его же можно запустить вручную:
+
+```sh
+python3 -m http.server 8000 -d tests/fixtures/maven
+./run.sh -p org.example:app:1.2.3 -r http://localhost:8000
+```
 
 ## Примеры использования
 
-Реальный репозиторий Maven:
+Реальный репозиторий Maven (Maven Central):
 
-```
-$ ./run.sh --package org.slf4j:slf4j-api:2.0.13 \
-    --repo https://repo1.maven.org/maven2
-package=org.slf4j:slf4j-api:2.0.13
-repo=https://repo1.maven.org/maven2
-mode=remote
+```sh
+./run.sh -p org.slf4j:slf4j-api:2.0.13 -r https://repo1.maven.org/maven2
+./run.sh -p com.google.guava:guava:33.2.1-jre \
+    -r https://repo1.maven.org/maven2
 ```
 
-Тестовый репозиторий:
+Тестовый репозиторий Maven из `tests/fixtures/maven` (наследование от
+`parent`, свойства, `dependencyManagement` и импорт BOM):
+
+```
+$ ./run.sh -p org.example:app:1.2.3 -r http://localhost:8000
+org.slf4j:slf4j-api:2.0.13 [compile]
+com.google.guava:guava:33.2.1-jre [runtime]
+org.example:core:1.2.3 [compile]
+org.apache.commons:commons-lang3:3.14.0 [compile] (optional)
+javax.servlet:javax.servlet-api:4.0.1 [provided]
+junit:junit:4.13.2 [test]
+```
+
+Тестовый репозиторий из файла:
 
 ```
 $ ./run.sh -p A -r repos/simple.txt -m test
-package=A
-repo=repos/simple.txt
-mode=test
+B
+C
+$ ./run.sh -p D -r repos/simple.txt -m test
+D: no direct dependencies
 ```
 
 Ошибки:
@@ -139,10 +222,8 @@ mode=test
 $ ./run.sh -p slf4j-api -r https://repo1.maven.org/maven2
 usage: depviz [-h] -p NAME -r URL_OR_PATH [-m {remote,test}]
 depviz: error: --package: 'slf4j-api': expected groupId:artifactId:version
-$ ./run.sh -p A -r repos/missing.txt -m test
-usage: depviz [-h] -p NAME -r URL_OR_PATH [-m {remote,test}]
-depviz: error: --repo: 'repos/missing.txt': no such test repository file
-$ ./run.sh -p A -r repos/simple.txt -m prod
-usage: depviz [-h] -p NAME -r URL_OR_PATH [-m {remote,test}]
-depviz: error: argument -m/--mode: invalid choice: 'prod' (choose from 'remote', 'test')
+$ ./run.sh -p org.example:nope:1.0 -r http://localhost:8000
+depviz: error: package not found in repository: http://localhost:8000/org/example/nope/1.0/nope-1.0.pom
+$ ./run.sh -p A -r repos/broken.txt -m test
+depviz: error: repos/broken.txt:2: expected 'NAME: DEPENDENCY ...' with capital Latin letters
 ```
