@@ -67,7 +67,8 @@ D:
 - `--package`:
   - не указан: `the following arguments are required: -p/--package`;
   - пустой: `--package: empty package name`;
-  - в режиме `remote` не в формате Maven:
+  - в режиме `remote` не в формате Maven (три непустые части через
+    двоеточие, каждая начинается с буквы или цифры):
     `--package: 'slf4j-api': expected groupId:artifactId:version`;
   - в режиме `test` не из больших латинских букв:
     `--package: 'a': in test mode the package name must consist of
@@ -77,6 +78,8 @@ D:
   - пустой: `--repo: empty repository location`;
   - в режиме `remote` не http(s) URL:
     `--repo: 'ftp://...': expected an http(s) URL of a Maven repository`;
+  - в режиме `remote` URL содержит пробельные символы:
+    `--repo: '...': URL must not contain whitespace`;
   - в режиме `test` файл не найден, это каталог или нет прав на
     чтение: `no such test repository file`, `not a file`,
     `permission denied`.
@@ -84,6 +87,7 @@ D:
   `argument -m/--mode: invalid choice: 'prod' (choose from 'remote',
   'test')`.
 - Неизвестный параметр: `unrecognized arguments: --depth 3`.
+- Сокращённые имена параметров (например, `--pack`) не принимаются.
 
 ## Сборка и запуск
 
@@ -105,7 +109,8 @@ python3 -m unittest discover -s tests -t . -v
 Скрипты ОС (`scripts/`):
 
 - `test_params.sh` — корректные запуски в режимах `remote` и `test`;
-- `test_errors.sh` — ошибки каждого параметра и неизвестный параметр.
+- `test_errors.sh` — ошибки каждого параметра и неизвестный параметр
+  (ошибка `permission denied` не воспроизводится при запуске от root).
 
 ## Примеры использования
 

@@ -17,16 +17,25 @@ echo "=== --package ==="
 run -r "$URL"
 run -p "" -r "$URL"
 run -p slf4j-api -r "$URL"
+run -p ..:..:.. -r "$URL"
 run -p a -r "$TEST_REPO" -m test
 
 echo "=== --repo ==="
 run -p "$PKG"
 run -p "$PKG" -r ""
 run -p "$PKG" -r ftp://repo1.maven.org/maven2
+run -p "$PKG" -r "$URL extra"
 run -p "$PKG" -r "$TEST_REPO"
 run -p A -r "repos/missing.txt" -m test
 run -p A -r repos -m test
+NO_READ="$(mktemp)"
+chmod 000 "$NO_READ"
+run -p A -r "$NO_READ" -m test
+rm -f "$NO_READ"
 
 echo "=== --mode ==="
 run -p "$PKG" -r "$URL" -m prod
+
+echo "=== неизвестные параметры ==="
 run -p "$PKG" -r "$URL" --depth 3
+run --pack "$PKG" -r "$URL"

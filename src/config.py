@@ -11,7 +11,7 @@ MODE_REMOTE = "remote"
 MODE_TEST = "test"
 MODES = (MODE_REMOTE, MODE_TEST)
 URL_SCHEMES = ("http", "https")
-MAVEN_PART = r"[A-Za-z0-9_.-]+"
+MAVEN_PART = r"[A-Za-z0-9][A-Za-z0-9_.-]*"
 MAVEN_PACKAGE = re.compile(
     rf"^{MAVEN_PART}:{MAVEN_PART}:{MAVEN_PART}$")
 TEST_PACKAGE = re.compile(r"^[A-Z]+$")
@@ -49,6 +49,7 @@ def build_parser():
     parser = argparse.ArgumentParser(
         prog=PROG,
         description="Визуализатор графа зависимостей пакетов Maven.",
+        allow_abbrev=False,
     )
     parser.add_argument(
         "-p", "--package", required=True, metavar="NAME",
@@ -84,6 +85,9 @@ def validate_package(package, mode):
 
 def validate_url(repo):
     """Проверить URL-адрес реального репозитория."""
+    if any(char.isspace() for char in repo):
+        raise ConfigError(
+            f"--repo: '{repo}': URL must not contain whitespace")
     parts = urlparse(repo)
     if parts.scheme not in URL_SCHEMES or not parts.netloc:
         raise ConfigError(

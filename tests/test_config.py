@@ -14,6 +14,8 @@ TEST_REPO = os.path.join(ROOT, "repos", "simple.txt")
 MAVEN_URL = "https://repo1.maven.org/maven2"
 MAVEN_PACKAGE = "org.slf4j:slf4j-api:2.0.13"
 EXIT_USAGE = 2
+ROOT_UID = 0
+IS_ROOT = getattr(os, "geteuid", lambda: None)() == ROOT_UID
 
 
 def run_error(test, argv):
@@ -69,7 +71,8 @@ class PackageErrorTest(unittest.TestCase):
 
     def test_not_maven(self):
         """В режиме remote нужен groupId:artifactId:version."""
-        for name in ("slf4j", "org.slf4j:slf4j-api", "a:b:c:d", "a b:c:d"):
+        for name in ("slf4j", "org.slf4j:slf4j-api", "a:b:c:d", "a b:c:d",
+                     "..:..:..", "org:-a:1", "org:a:1 "):
             with self.subTest(name=name):
                 msg = run_error(self, ["-p", name, "-r", MAVEN_URL])
                 self.assertIn("groupId:artifactId:version", msg)
@@ -104,6 +107,13 @@ class RepoErrorTest(unittest.TestCase):
                 msg = run_error(self, ["-p", MAVEN_PACKAGE, "-r", repo])
                 self.assertIn("expected an http(s) URL", msg)
 
+    def test_url_whitespace(self):
+        """URL-адрес не может содержать пробельные символы."""
+        for repo in (" " + MAVEN_URL, MAVEN_URL + " extra", MAVEN_URL + "\t"):
+            with self.subTest(repo=repo):
+                msg = run_error(self, ["-p", MAVEN_PACKAGE, "-r", repo])
+                self.assertIn("must not contain whitespace", msg)
+
     def test_file_not_found(self):
         """В режиме test файл должен существовать."""
         msg = run_error(self, ["-p", "A", "-r", MAVEN_URL, "-m", "test"])
@@ -115,6 +125,17 @@ class RepoErrorTest(unittest.TestCase):
             msg = run_error(self, ["-p", "A", "-r", path, "-m", "test"])
         self.assertIn("not a file", msg)
 
+    @unittest.skipIf(IS_ROOT, "root может читать любой файл")
+    def test_permission_denied(self):
+        """В режиме test файл должен быть доступен для чтения."""
+        with tempfile.TemporaryDirectory() as path:
+            repo = os.path.join(path, "repo.txt")
+            with open(repo, "w", encoding="utf-8") as file:
+                file.write("A:\n")
+            os.chmod(repo, 0)
+            msg = run_error(self, ["-p", "A", "-r", repo, "-m", "test"])
+        self.assertIn("permission denied", msg)
+
 
 class ModeErrorTest(unittest.TestCase):
     """Ошибки параметра --mode."""
@@ -125,11 +146,20 @@ class ModeErrorTest(unittest.TestCase):
             self, ["-p", MAVEN_PACKAGE, "-r", MAVEN_URL, "-m", "prod"])
         self.assertIn("invalid choice: 'prod'", msg)
 
+
+class UnknownOptionTest(unittest.TestCase):
+    """Неизвестные и сокращённые параметры."""
+
     def test_unknown_option(self):
         """Неизвестный параметр командной строки."""
         msg = run_error(
             self, ["-p", MAVEN_PACKAGE, "-r", MAVEN_URL, "--depth", "3"])
         self.assertIn("unrecognized arguments", msg)
+
+    def test_no_abbreviations(self):
+        """Сокращённые имена параметров не принимаются."""
+        msg = run_error(self, ["--pack", MAVEN_PACKAGE, "-r", MAVEN_URL])
+        self.assertIn("-p/--package", msg)
 
 
 if __name__ == "__main__":
