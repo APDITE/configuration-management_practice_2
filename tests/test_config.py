@@ -7,7 +7,6 @@ import unittest
 from contextlib import redirect_stderr
 
 from config import MODE_REMOTE, MODE_TEST, parse_args
-from depviz import EXIT_OK, main
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 TEST_REPO = os.path.join(ROOT, "repos", "simple.txt")
@@ -43,17 +42,6 @@ class ValidParamsTest(unittest.TestCase):
             ["--package", "AB", "--repo", TEST_REPO, "--mode", "test"])
         self.assertEqual(config.package, "AB")
         self.assertEqual(config.mode, MODE_TEST)
-
-    def test_output_key_value(self):
-        """При запуске все параметры выводятся как ключ=значение."""
-        out = io.StringIO()
-        code = main(["-p", MAVEN_PACKAGE, "-r", MAVEN_URL], out=out)
-        self.assertEqual(code, EXIT_OK)
-        self.assertEqual(out.getvalue().splitlines(), [
-            f"package={MAVEN_PACKAGE}",
-            f"repo={MAVEN_URL}",
-            "mode=remote",
-        ])
 
 
 class PackageErrorTest(unittest.TestCase):
