@@ -28,12 +28,14 @@ class Config:
     package -- имя анализируемого пакета;
     repo -- URL-адрес репозитория или путь к файлу тестового репозитория;
     mode -- режим работы: remote (реальный репозиторий) или test
-    (тестовый репозиторий из файла).
+    (тестовый репозиторий из файла);
+    load_order -- вывести порядок загрузки зависимостей вместо графа.
     """
 
     package: str
     repo: str
     mode: str = MODE_REMOTE
+    load_order: bool = False
 
     def items(self):
         """Вернуть параметры как список пар (ключ, значение)."""
@@ -41,6 +43,7 @@ class Config:
             ("package", self.package),
             ("repo", self.repo),
             ("mode", self.mode),
+            ("load_order", self.load_order),
         ]
 
 
@@ -64,6 +67,10 @@ def build_parser():
     parser.add_argument(
         "-m", "--mode", choices=MODES, default=MODE_REMOTE,
         help="режим работы с репозиторием (по умолчанию remote)",
+    )
+    parser.add_argument(
+        "-l", "--load-order", action="store_true",
+        help="вывести порядок загрузки зависимостей вместо графа",
     )
     return parser
 
@@ -124,7 +131,8 @@ def parse_args(argv=None):
     """
     parser = build_parser()
     args = parser.parse_args(argv)
-    config = Config(package=args.package, repo=args.repo, mode=args.mode)
+    config = Config(package=args.package, repo=args.repo, mode=args.mode,
+                    load_order=args.load_order)
     try:
         validate(config)
     except ConfigError as error:

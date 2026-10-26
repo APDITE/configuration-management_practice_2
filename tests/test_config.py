@@ -42,6 +42,15 @@ class ValidParamsTest(unittest.TestCase):
             ["--package", "AB", "--repo", TEST_REPO, "--mode", "test"])
         self.assertEqual(config.package, "AB")
         self.assertEqual(config.mode, MODE_TEST)
+        self.assertFalse(config.load_order)
+
+    def test_load_order_flag(self):
+        """Параметр -l/--load-order включает вывод порядка загрузки."""
+        for flag in ("-l", "--load-order"):
+            with self.subTest(flag=flag):
+                config = parse_args(
+                    ["-p", "A", "-r", TEST_REPO, "-m", "test", flag])
+                self.assertTrue(config.load_order)
 
 
 class PackageErrorTest(unittest.TestCase):
