@@ -109,6 +109,30 @@ class DependencyStrTest(unittest.TestCase):
         self.assertEqual(str(dependency), "g:a:? [test] (optional)")
 
 
+class TransitiveTest(unittest.TestCase):
+    """Какие зависимости передаются потребителю пакета."""
+
+    def test_transitive_scopes(self):
+        """compile (по умолчанию) и runtime передаются."""
+        for scope in ("", "compile", "runtime"):
+            with self.subTest(scope=scope):
+                self.assertTrue(Dependency("g", "a", "1", scope).is_transitive)
+
+    def test_not_transitive(self):
+        """test, provided, system и optional не передаются."""
+        for scope in ("test", "provided", "system"):
+            with self.subTest(scope=scope):
+                self.assertFalse(
+                    Dependency("g", "a", "1", scope).is_transitive)
+        optional = Dependency("g", "a", "1", optional="true")
+        self.assertFalse(optional.is_transitive)
+
+    def test_coordinates(self):
+        """Координаты зависимости; неизвестная версия -- «?»."""
+        self.assertEqual(Dependency("g", "a", "1").coordinates, "g:a:1")
+        self.assertEqual(Dependency("g", "a").coordinates, "g:a:?")
+
+
 class InterpolateTest(unittest.TestCase):
     """Подстановка свойств ${name}."""
 

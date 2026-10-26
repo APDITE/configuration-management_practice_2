@@ -33,6 +33,17 @@ class MavenRepositoryTest(unittest.TestCase):
             "junit:junit:4.13.2 [test]",
         ])
 
+    def test_transitive_names(self):
+        """Транзитивно передаются только compile и runtime без optional."""
+        with MavenServer() as server:
+            repository = MavenRepository(server.url)
+            names = repository.dependency_names("org.example:lib:1.0")
+        self.assertEqual(names, [
+            "org.example:core:1.2.3",
+            "org.example:rt:1.0",
+            "org.example:ghost:1.0",
+        ])
+
     def test_no_dependencies(self):
         """POM без зависимостей и без пространства имён."""
         self.assertEqual(self.dependencies("org.example:core:1.2.3"), [])
