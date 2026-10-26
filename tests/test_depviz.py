@@ -52,15 +52,11 @@ class RemoteModeTest(unittest.TestCase):
 
     def test_dependencies_and_error(self):
         """Вывод зависимостей и ошибка для отсутствующего пакета."""
-        server = MavenServer()
-        server.start()
-        try:
+        with MavenServer() as server:
             code, out, _ = run_main(
                 ["-p", "org.example:app:1.2.3", "-r", server.url])
             failed, _, err = run_main(
                 ["-p", "org.example:nope:1.0", "-r", server.url])
-        finally:
-            server.stop()
         self.assertEqual(code, EXIT_OK)
         self.assertIn("org.example:core:1.2.3 [compile]", out)
         self.assertEqual(failed, EXIT_FAILURE)

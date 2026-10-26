@@ -45,3 +45,12 @@ class MavenServer:
         self.httpd.shutdown()
         self.httpd.server_close()
         self.thread.join()
+
+    def __enter__(self):
+        """Запустить сервер при входе в блок with."""
+        self.start()
+        return self
+
+    def __exit__(self, *exc_info):
+        """Остановить сервер при выходе из блока with."""
+        self.stop()

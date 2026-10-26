@@ -12,21 +12,15 @@ CLOSED_PORT_URL = "http://127.0.0.1:9"
 class MavenRepositoryTest(unittest.TestCase):
     """Прямые зависимости пакетов из локального тестового репозитория."""
 
-    @classmethod
-    def setUpClass(cls):
-        """Запустить HTTP-сервер с тестовыми POM."""
-        cls.server = MavenServer()
-        cls.server.start()
-
-    @classmethod
-    def tearDownClass(cls):
-        """Остановить HTTP-сервер."""
-        cls.server.stop()
-
     def dependencies(self, package):
-        """Вернуть прямые зависимости пакета строками."""
-        repository = MavenRepository(self.server.url + "/")
-        return [str(item) for item in repository.direct_dependencies(package)]
+        """Вернуть прямые зависимости пакета строками.
+
+        На время запроса запускается локальный HTTP-сервер.
+        """
+        with MavenServer() as server:
+            repository = MavenRepository(server.url + "/")
+            return [str(item)
+                    for item in repository.direct_dependencies(package)]
 
     def test_effective_dependencies(self):
         """Наследование, свойства, dependencyManagement и импорт BOM."""
