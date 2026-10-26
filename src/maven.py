@@ -204,3 +204,9 @@ class MavenRepository:
             chain, properties, frozenset({coords}))
         return [apply_management(dependency, managed)
                 for dependency in collect_dependencies(chain, properties)]
+
+    def dependency_names(self, package):
+        """Вернуть координаты зависимостей, передаваемых транзитивно."""
+        return [dependency.coordinates
+                for dependency in self.direct_dependencies(package)
+                if dependency.is_transitive]

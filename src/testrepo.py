@@ -60,3 +60,7 @@ class FileRepository:
             raise RepositoryError(
                 f"package '{package}' not found in test repository")
         return list(self.graph.get(package, []))
+
+    def dependency_names(self, package):
+        """Вернуть имена зависимостей пакета (все передаются транзитивно)."""
+        return self.direct_dependencies(package)

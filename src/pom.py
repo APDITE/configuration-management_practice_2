@@ -10,6 +10,7 @@ from xml.etree import ElementTree
 from dataclasses import dataclass, field, replace
 
 DEFAULT_SCOPE = "compile"
+TRANSITIVE_SCOPES = ("compile", "runtime")
 IMPORT_SCOPE = "import"
 POM_TYPE = "pom"
 TRUE = "true"
@@ -71,6 +72,22 @@ class Dependency:
         return self.optional.strip().lower() == TRUE
 
     @property
+    def is_transitive(self):
+        """Передаётся ли зависимость тем, кто использует пакет.
+
+        По правилам Maven потребителю пакета передаются только
+        обязательные зависимости со scope compile или runtime;
+        зависимости test, provided, system и optional -- нет.
+        """
+        scope = self.scope or DEFAULT_SCOPE
+        return scope in TRANSITIVE_SCOPES and not self.is_optional
+
+    @property
+    def coordinates(self):
+        """Координаты зависимости в виде groupId:artifactId:version."""
+        return f"{self.group}:{self.artifact}:{self.version or '?'}"
+
+    @property
     def is_bom_import(self):
         """Является ли запись импортом BOM в dependencyManagement."""
         return self.scope == IMPORT_SCOPE and self.kind == POM_TYPE
@@ -85,9 +102,7 @@ class Dependency:
 
     def __str__(self):
         """Вернуть строку вида groupId:artifactId:version [scope]."""
-        version = self.version or "?"
-        text = f"{self.group}:{self.artifact}:{version}"
-        text += f" [{self.scope or DEFAULT_SCOPE}]"
+        text = f"{self.coordinates} [{self.scope or DEFAULT_SCOPE}]"
         if self.is_optional:
             text += " (optional)"
         return text
