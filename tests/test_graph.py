@@ -4,7 +4,7 @@ import os
 import sys
 import unittest
 
-from graph import build_graph, find_cycles
+from graph import build_graph, find_cycles, load_order
 from testrepo import FileRepository
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -98,6 +98,50 @@ class FindCyclesTest(unittest.TestCase):
         """Цикл из корня и циклы глубже в графе."""
         self.assertEqual(self.cycles("complex", "X"), [
             ["X", "Y", "X"], ["B", "E", "H", "B"], ["C", "F", "C"]])
+
+
+class LoadOrderTest(unittest.TestCase):
+    """Порядок загрузки зависимостей."""
+
+    def order(self, name, root="A"):
+        """Порядок загрузки для тестового репозитория."""
+        return load_order(build_graph(root, load(name)), root)
+
+    def test_diamond(self):
+        """Зависимости загружаются раньше зависящих от них пакетов."""
+        self.assertEqual(self.order("simple"), ["D", "B", "C", "A"])
+
+    def test_each_package_after_dependencies(self):
+        """Для графа без циклов каждый пакет идёт после зависимостей."""
+        graph = build_graph("A", load("simple"))
+        order = load_order(graph, "A")
+        for package, dependencies in graph.items():
+            for dependency in dependencies:
+                with self.subTest(package=package, dependency=dependency):
+                    self.assertLess(
+                        order.index(dependency), order.index(package))
+
+    def test_all_reachable_once(self):
+        """Каждый достижимый пакет загружается ровно один раз."""
+        order = self.order("complex")
+        self.assertEqual(sorted(order), sorted(set("ABCDEFGH")))
+        self.assertEqual(order[-1], "A")
+
+    def test_cycle(self):
+        """Цикл не мешает построить порядок; корень -- последний."""
+        self.assertEqual(self.order("cycle"), ["D", "C", "B", "A"])
+        self.assertEqual(self.order("self"), ["B", "A"])
+
+    def test_leaf(self):
+        """Пакет без зависимостей."""
+        self.assertEqual(self.order("simple", "D"), ["D"])
+
+    def test_deep_chain_without_recursion(self):
+        """Цепочка длиннее предела рекурсии: порядок от конца к началу."""
+        chain = {i: [i + 1] for i in range(CHAIN_LENGTH)}
+        chain[CHAIN_LENGTH] = []
+        order = load_order(build_graph(0, chain.get), 0)
+        self.assertEqual(order, list(range(CHAIN_LENGTH, -1, -1)))
 
 
 if __name__ == "__main__":
