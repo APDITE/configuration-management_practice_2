@@ -57,3 +57,29 @@ def find_cycles(graph, root):
             path.append(dependency)
             stack.append(iter(graph.get(dependency, [])))
     return cycles
+
+
+def load_order(graph, root):
+    """Вернуть порядок загрузки пакетов, достижимых из root.
+
+    Каждый пакет идёт после всех своих зависимостей, root -- последним.
+    Это обратный порядок обхода в глубину (post-order): пакет
+    добавляется в результат, когда обработаны все его зависимости.
+    Обход выполняется без рекурсии. Ребро в пакет, находящийся на
+    текущем пути (цикл), пропускается: внутри цикла порядок загрузки
+    определяется тем, с какого пакета цикл был достигнут.
+    """
+    order = []
+    color = {root: GRAY}
+    stack = [(root, iter(graph.get(root, [])))]
+    while stack:
+        package, dependencies = stack[-1]
+        dependency = next(dependencies, None)
+        if dependency is None:
+            stack.pop()
+            color[package] = BLACK
+            order.append(package)
+        elif color.get(dependency, WHITE) == WHITE:
+            color[dependency] = GRAY
+            stack.append((dependency, iter(graph.get(dependency, []))))
+    return order
