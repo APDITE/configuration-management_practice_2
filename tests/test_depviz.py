@@ -44,6 +44,21 @@ class TestModeTest(unittest.TestCase):
             "cycle: A -> B -> C -> A",
         ])
 
+    def test_load_order(self):
+        """Порядок загрузки: зависимости раньше зависящих пакетов."""
+        code, out, _ = run_main(
+            ["-p", "A", "-r", SIMPLE_REPO, "-m", "test", "-l"])
+        self.assertEqual(code, EXIT_OK)
+        self.assertEqual(out, ["1. D", "2. B", "3. C", "4. A"])
+
+    def test_load_order_with_cycle(self):
+        """Порядок загрузки при цикле и строка с циклом."""
+        code, out, _ = run_main(
+            ["-p", "A", "-r", CYCLE_REPO, "-m", "test", "--load-order"])
+        self.assertEqual(code, EXIT_OK)
+        self.assertEqual(out, [
+            "1. D", "2. C", "3. B", "4. A", "cycle: A -> B -> C -> A"])
+
     def test_errors(self):
         """Неизвестный пакет и ошибка формата файла."""
         cases = (("Z", SIMPLE_REPO, "'Z' not found"),
@@ -83,6 +98,19 @@ class RemoteModeTest(unittest.TestCase):
         self.assertEqual(code, EXIT_OK)
         self.assertIn("org.example:ghost:1.0 (not resolved)", out)
         self.assertIn("warning: org.example:ghost:1.0", err)
+
+    def test_remote_load_order(self):
+        """Порядок загрузки в режиме remote; корень загружается последним."""
+        with MavenServer() as server:
+            code, out, _ = run_main(
+                ["-p", "org.example:lib:1.0", "-r", server.url, "-l"])
+        self.assertEqual(code, EXIT_OK)
+        self.assertEqual(out, [
+            "1. org.example:core:1.2.3",
+            "2. org.example:rt:1.0",
+            "3. org.example:ghost:1.0 (not resolved)",
+            "4. org.example:lib:1.0",
+        ])
 
 
 if __name__ == "__main__":

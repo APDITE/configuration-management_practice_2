@@ -1,16 +1,17 @@
 """Точка входа визуализатора графа зависимостей.
 
-Этап 3: построение графа зависимостей заданного пакета с учётом
-транзитивности (обход в глубину без рекурсии) и поиск циклических
-зависимостей в реальном репозитории Maven (режим remote) или в
-тестовом репозитории из файла (режим test).
+Строит граф зависимостей заданного пакета с учётом транзитивности
+(обход в глубину без рекурсии) и находит циклические зависимости в
+реальном репозитории Maven (режим remote) или в тестовом репозитории
+из файла (режим test). Выводит граф или, с параметром --load-order,
+порядок загрузки зависимостей (этап 4).
 """
 
 import sys
 
 from config import MODE_TEST, PROG, parse_args
 from errors import RepositoryError
-from graph import build_graph, find_cycles
+from graph import build_graph, find_cycles, load_order
 from maven import MavenRepository
 from testrepo import FileRepository
 
@@ -68,8 +69,28 @@ def format_cycles(cycles):
     return ["cycle: " + " -> ".join(cycle) for cycle in cycles]
 
 
+def format_load_order(order, failures):
+    """Вернуть пронумерованные строки порядка загрузки «1. пакет»."""
+    lines = []
+    for number, package in enumerate(order, start=1):
+        line = f"{number}. {package}"
+        if package in failures:
+            line += " (not resolved)"
+        lines.append(line)
+    return lines
+
+
+def render(config, graph, failures):
+    """Вернуть строки вывода: граф или порядок загрузки, затем циклы."""
+    if config.load_order:
+        lines = format_load_order(load_order(graph, config.package), failures)
+    else:
+        lines = format_graph(graph, failures)
+    return lines + format_cycles(find_cycles(graph, config.package))
+
+
 def main(argv=None, out=None, err=None):
-    """Построить и вывести граф зависимостей; вернуть код завершения."""
+    """Построить граф и вывести результат; вернуть код завершения."""
     config = parse_args(argv)
     out = out or sys.stdout
     err = err or sys.stderr
@@ -81,8 +102,7 @@ def main(argv=None, out=None, err=None):
         return EXIT_FAILURE
     for package, reason in source.failures.items():
         print(f"{PROG}: warning: {package}: {reason}", file=err)
-    cycles = find_cycles(graph, config.package)
-    for line in format_graph(graph, source.failures) + format_cycles(cycles):
+    for line in render(config, graph, source.failures):
         print(line, file=out)
     return EXIT_OK
 
