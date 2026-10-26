@@ -89,7 +89,7 @@ class RepoErrorTest(unittest.TestCase):
 
     def test_bad_url(self):
         """В режиме remote допустим только http(s) URL."""
-        for repo in ("ftp://host/maven2", "repo1.maven.org", TEST_REPO,
+        for repo in ("ftp://host/maven2", "repo1.maven.org", "repos/simple.txt",
                      "https://"):
             with self.subTest(repo=repo):
                 msg = run_error(self, ["-p", MAVEN_PACKAGE, "-r", repo])
