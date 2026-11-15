@@ -15,7 +15,8 @@
 описание графа на языке диаграмм [D2](https://d2lang.com). Источник
 данных — реальный репозиторий Maven (файлы POM) или тестовый
 репозиторий из текстового файла. Результаты сравнения с Maven — в
-разделе «Сравнение порядка загрузки с Maven».
+разделах «Сравнение порядка загрузки с Maven» и «Сравнение
+визуализации с Maven».
 
 Сторонние зависимости не требуются — только стандартная библиотека
 Python 3.8+: `argparse` (параметры), `urllib.request` (загрузка файлов
@@ -299,6 +300,100 @@ Maven: правильно разобраны родительский POM `guava
 - диапазоны версий (`[1.0,2.0)`) Maven разрешает по списку доступных
   версий, а depviz не может загрузить такой пакет и помечает его
   `(not resolved)`.
+
+## Сравнение визуализации с Maven
+
+Граф depviz сравнивался со штатным инструментом визуализации Maven —
+деревом зависимостей `mvn dependency:tree` (Maven 3.10.0, обычный и
+подробный режим `-Dverbose`) — скриптом `scripts/compare_tree.sh` для
+трёх пакетов. Описания D2 для них выводит `scripts/test_d2.sh`.
+
+| Пакет | Пакетов в графе depviz | Пакетов в дереве Maven | Рёбер depviz | Рёбер Maven / `-Dverbose` |
+|---|---|---|---|---|
+| guava 33.2.1-jre | 7 | 7 | 6 | 6 / 6 |
+| jackson-databind 2.17.1 | 3 | 3 | 2 | 2 / 2 |
+| spring-context 6.1.8 | 8 | 8 | 11 | 7 / 11 |
+
+**Совпадения.** Для всех трёх пакетов наборы пакетов и их версии
+совпадают с Maven, в том числе версии, которые берутся из родительских
+POM (`guava-parent`) и из импорта BOM (`jackson-bom`). Для guava и
+jackson-databind совпадают и все связи: у их зависимостей нет своих
+зависимостей, поэтому граф и дерево выглядят одинаково.
+
+**Расхождение: граф и дерево.** Описание D2 для spring-context:
+
+```
+direction: down
+n0: "org.springframework\nspring-context\n6.1.8"
+n0.style.fill: "#cfe8ff"
+n1: "org.springframework\nspring-aop\n6.1.8"
+n2: "org.springframework\nspring-beans\n6.1.8"
+n3: "org.springframework\nspring-core\n6.1.8"
+n4: "org.springframework\nspring-jcl\n6.1.8"
+n5: "org.springframework\nspring-expression\n6.1.8"
+n6: "io.micrometer\nmicrometer-observation\n1.12.6"
+n7: "io.micrometer\nmicrometer-commons\n1.12.6"
+n0 -> n1
+n0 -> n2
+n0 -> n3
+n0 -> n5
+n0 -> n6
+n1 -> n2
+n1 -> n3
+n2 -> n3
+n3 -> n4
+n5 -> n3
+n6 -> n7
+```
+
+Дерево Maven для того же пакета:
+
+```
+depviz.compare:consumer:jar:1.0
+\- org.springframework:spring-context:jar:6.1.8:compile
+   +- org.springframework:spring-aop:jar:6.1.8:compile
+   +- org.springframework:spring-beans:jar:6.1.8:compile
+   +- org.springframework:spring-core:jar:6.1.8:compile
+   |  \- org.springframework:spring-jcl:jar:6.1.8:compile
+   +- org.springframework:spring-expression:jar:6.1.8:compile
+   \- io.micrometer:micrometer-observation:jar:1.12.6:compile
+      \- io.micrometer:micrometer-commons:jar:1.12.6:compile
+```
+
+В графе depviz 11 рёбер, в дереве Maven — 7. Не показаны рёбра
+`spring-aop -> spring-beans`, `spring-aop -> spring-core`,
+`spring-beans -> spring-core` и `spring-expression -> spring-core`.
+Причина — разная форма визуализации:
+
+- `dependency:tree` выводит **дерево**: каждый пакет показывается один
+  раз, в ближайшем к проекту месте (spring-core — прямая зависимость
+  spring-context), а повторные вхождения отбрасываются;
+- depviz строит **граф**: каждый пакет — один узел, но в него ведут все
+  рёбра от зависящих от него пакетов. Поэтому видно, что spring-core
+  нужен четырём пакетам.
+
+Подробный режим Maven подтверждает, что рёбра есть, а не придуманы
+depviz: `mvn dependency:tree -Dverbose` показывает все 4 недостающих
+ребра с пометкой `omitted for duplicate`, например:
+
+```
+   +- org.springframework:spring-aop:jar:6.1.8:compile
+   |  +- (org.springframework:spring-beans:jar:6.1.8:compile - omitted for duplicate)
+   |  \- (org.springframework:spring-core:jar:6.1.8:compile - omitted for duplicate)
+```
+
+С подробным режимом наборы рёбер depviz и Maven совпадают полностью.
+
+**Остальные отличия оформления.**
+
+- Maven показывает корнем временный проект `depviz.compare:consumer`,
+  который зависит от пакета; в depviz корень — сам пакет.
+- Maven указывает тип (`jar`) и scope (`compile`) каждого пакета;
+  depviz не показывает их, так как в граф попадают только зависимости
+  `compile` и `runtime`.
+- `dependency:tree` — текст, depviz — описание на языке D2, из которого
+  утилита `d2` строит изображение; циклы и недоступные пакеты в нём
+  выделяются цветом и пунктиром.
 
 ## Сборка и запуск
 
