@@ -27,3 +27,6 @@ htmlcov/
 
 # macOS
 .DS_Store
+
+# Изображения графов, создаваемые scripts/test_d2.sh
+out/
