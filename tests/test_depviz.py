@@ -59,6 +59,15 @@ class TestModeTest(unittest.TestCase):
         self.assertEqual(out, [
             "1. D", "2. C", "3. B", "4. A", "cycle: A -> B -> C -> A"])
 
+    def test_d2(self):
+        """Описание графа на языке D2 с выделенным циклом."""
+        code, out, _ = run_main(
+            ["-p", "A", "-r", CYCLE_REPO, "-m", "test", "--d2"])
+        self.assertEqual(code, EXIT_OK)
+        self.assertEqual(out[0], "direction: down")
+        self.assertIn("n2 -> n0: cycle {style.stroke: red}", out)
+        self.assertFalse(any(line.startswith("cycle:") for line in out))
+
     def test_errors(self):
         """Неизвестный пакет и ошибка формата файла."""
         cases = (("Z", SIMPLE_REPO, "'Z' not found"),
@@ -98,6 +107,16 @@ class RemoteModeTest(unittest.TestCase):
         self.assertEqual(code, EXIT_OK)
         self.assertIn("org.example:ghost:1.0 (not resolved)", out)
         self.assertIn("warning: org.example:ghost:1.0", err)
+
+    def test_remote_d2(self):
+        """Описание D2 в режиме remote: подписи и недоступный пакет."""
+        with MavenServer() as server:
+            code, out, _ = run_main(
+                ["-p", "org.example:lib:1.0", "-r", server.url, "-d"])
+        self.assertEqual(code, EXIT_OK)
+        self.assertIn('n0: "org.example\\nlib\\n1.0"', out)
+        self.assertIn("n3.style.stroke-dash: 3", out)
+        self.assertIn("n2 -> n1", out)
 
     def test_remote_load_order(self):
         """Порядок загрузки в режиме remote; корень загружается последним."""

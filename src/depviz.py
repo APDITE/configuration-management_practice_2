@@ -3,13 +3,15 @@
 Строит граф зависимостей заданного пакета с учётом транзитивности
 (обход в глубину без рекурсии) и находит циклические зависимости в
 реальном репозитории Maven (режим remote) или в тестовом репозитории
-из файла (режим test). Выводит граф или, с параметром --load-order,
-порядок загрузки зависимостей (этап 4).
+из файла (режим test). Выводит граф в текстовом виде, порядок
+загрузки зависимостей (параметр --load-order, этап 4) или описание
+графа на языке диаграмм D2 (параметр --d2, этап 5).
 """
 
 import sys
 
 from config import MODE_TEST, PROG, parse_args
+from d2 import to_d2
 from errors import RepositoryError
 from graph import build_graph, find_cycles, load_order
 from maven import MavenRepository
@@ -81,12 +83,20 @@ def format_load_order(order, failures):
 
 
 def render(config, graph, failures):
-    """Вернуть строки вывода: граф или порядок загрузки, затем циклы."""
+    """Вернуть строки вывода в формате, выбранном параметрами.
+
+    Описание D2 содержит циклы в виде выделенных рёбер; в текстовых
+    форматах циклы выводятся после графа или порядка загрузки.
+    """
+    root = config.package
+    cycles = find_cycles(graph, root)
+    if config.d2:
+        return to_d2(graph, root, cycles, failures)
     if config.load_order:
-        lines = format_load_order(load_order(graph, config.package), failures)
+        lines = format_load_order(load_order(graph, root), failures)
     else:
         lines = format_graph(graph, failures)
-    return lines + format_cycles(find_cycles(graph, config.package))
+    return lines + format_cycles(cycles)
 
 
 def main(argv=None, out=None, err=None):
