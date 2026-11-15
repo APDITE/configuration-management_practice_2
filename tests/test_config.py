@@ -43,6 +43,15 @@ class ValidParamsTest(unittest.TestCase):
         self.assertEqual(config.package, "AB")
         self.assertEqual(config.mode, MODE_TEST)
         self.assertFalse(config.load_order)
+        self.assertFalse(config.d2)
+
+    def test_d2_flag(self):
+        """Параметр -d/--d2 включает вывод описания графа на языке D2."""
+        for flag in ("-d", "--d2"):
+            with self.subTest(flag=flag):
+                config = parse_args(
+                    ["-p", "A", "-r", TEST_REPO, "-m", "test", flag])
+                self.assertTrue(config.d2)
 
     def test_load_order_flag(self):
         """Параметр -l/--load-order включает вывод порядка загрузки."""
@@ -152,6 +161,12 @@ class UnknownOptionTest(unittest.TestCase):
         msg = run_error(
             self, ["-p", MAVEN_PACKAGE, "-r", MAVEN_URL, "--depth", "3"])
         self.assertIn("unrecognized arguments", msg)
+
+    def test_d2_with_load_order(self):
+        """Параметры --d2 и --load-order несовместимы."""
+        msg = run_error(
+            self, ["-p", "A", "-r", TEST_REPO, "-m", "test", "-l", "-d"])
+        self.assertIn("not allowed with argument", msg)
 
     def test_no_abbreviations(self):
         """Сокращённые имена параметров не принимаются."""
